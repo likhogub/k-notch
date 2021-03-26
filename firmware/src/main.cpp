@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include "Kalman.h"
 #include "MPU9250.h"
 
 int id = 0; //Device id
@@ -37,6 +38,8 @@ void setup() {
     startWiFi();
     initDeviceId();
     if (initIMU() < 0) esp_restart();
+    IMU.calibrateGyro();
+    IMU.calibrateAccel();
 }
 
 void loop() {
@@ -85,7 +88,6 @@ int initIMU() {
     } else {
         IMU.setAccelRange(MPU9250::ACCEL_RANGE_4G);
         IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
-        IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_184HZ);
     }
     return status;
 }
@@ -95,15 +97,15 @@ int isIMUReady() {
 }
 
 void packRecord() {
-    rec.ax = IMU.getAccelX_mss();
-    rec.ay = IMU.getAccelY_mss();
-    rec.az = IMU.getAccelZ_mss();
-    rec.gx = IMU.getGyroX_rads();
-    rec.gy = IMU.getGyroY_rads();
-    rec.gz = IMU.getGyroZ_rads();
-    rec.mx = IMU.getMagX_uT();
-    rec.my = IMU.getMagY_uT();
-    rec.mz = IMU.getMagZ_uT();
+    rec.ax = Kalman::filter(IMU.getAccelX_mss(), 0);
+    rec.ay = Kalman::filter(IMU.getAccelY_mss(), 1);
+    rec.az = Kalman::filter(IMU.getAccelZ_mss(), 2);
+    rec.gx = Kalman::filter(IMU.getGyroX_rads(), 3);
+    rec.gy = Kalman::filter(IMU.getGyroY_rads(), 4);
+    rec.gz = Kalman::filter(IMU.getGyroZ_rads(), 5);
+    rec.mx = Kalman::filter(IMU.getMagX_uT(), 6);
+    rec.my = Kalman::filter(IMU.getMagY_uT(), 7);
+    rec.mz = Kalman::filter(IMU.getMagZ_uT(), 8);
 }
 
 int sendRecord() {
