@@ -1,4 +1,4 @@
-#include "Socket.cpp"
+#include "TCPSocket.cpp"
 #include <pthread.h>
 #include <chrono>
 #include <mutex>
@@ -21,8 +21,8 @@ struct ThreadArgs {
     Record* recordBuffer;
 };
 
-std::chrono::duration<long int, std::ratio<1, 1000000000> >::rep startTime;
-std::chrono::duration<long int, std::ratio<1, 1000000000> >::rep endTime;
+std::chrono::duration<long int, std::ratio<1, 1000000000>>::rep startTime;
+std::chrono::duration<long int, std::ratio<1, 1000000000>>::rep endTime;
 
 void printRecord(Record* rec) {
     cout << rec->id << " " 
