@@ -1,4 +1,4 @@
-#include "TCPSocket.cpp"
+#include "lib/TCPSocket.cpp"
 #include <thread>
 #include <atomic>
 #include <chrono>
@@ -37,11 +37,12 @@ int ms(long start) {
     return ms() - start;
 }
 
+// Save measurements to disk as .csv
 void saveToCSV(long start, long stop) {
-    cout << start << " " << stop << endl;
     string path("recordings/");
     path += to_string(start);
     path += ".csv";
+    cout << path << endl;
     fstream file(path.c_str(), ios::out);
     for (int i = 0; i < (stop-start); i++) {
         file << i;
@@ -104,6 +105,47 @@ void acceptorThread(Socket acceptorSocket) {
     }
 }
 
+
+// Sends last non-zero measurement to client
+void dataGateThread(Socket clientSocket) {
+    char* buf = new char[129];
+    while (1) {
+        int receivedBytes = receiveDataTCP(clientSocket, buf, 128); // Wait request
+        if (receivedBytes <= 0) break; // Interrupt if error or disconnect
+        int millis = (startTime) ? ms(startTime) : 0;
+        for (int i = millis; i >= 0; i--) {
+            bool found = false;
+            for (int j = 0; j < DEVICES; j++) {
+                if (i == 0 || storage[i][j].id != 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
+                sendDataTCP(clientSocket, (char*)&(storage[i]), sizeof(storage[i]));
+                break;
+            }
+        }
+    }
+    cout << "[INFO] Data gate client disconnected." << endl;
+    close(clientSocket);
+    delete buf;
+}
+
+void dataGateAcceptorThread() {
+    Socket dataGateSocket = createSocketTCP();
+    SocketProps* dataGateProps = createSocketProps(1235);
+    setsockopt(dataGateSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port
+    bindSocket(dataGateSocket, dataGateProps);
+    listenSocket(dataGateSocket);
+    while (1) {
+        Socket clientSocket = acceptSocket(dataGateSocket);
+        cout << "[INFO] Data gate client connected." << endl;
+        thread newThread(dataGateThread, clientSocket);
+        newThread.detach();
+    }
+}
+
 int main() {
     Socket acceptorSocket = createSocketTCP();
     SocketProps* acceptorProps = createSocketProps(1234);
@@ -111,6 +153,8 @@ int main() {
     bindSocket(acceptorSocket, acceptorProps);
     listenSocket(acceptorSocket);
     thread acceptor(acceptorThread, acceptorSocket); // Run async device acceptor
+    thread dataGate(dataGateAcceptorThread); // Run async device acceptor
+
     while (1) {
         char ch;
         cin >> ch;
@@ -151,6 +195,23 @@ int main() {
                 } else {
                     cout << "[WARNING] Recording not saved. Recording now..." << endl;
                 }
+                break;
+            }
+            case 'q': {
+                cout << "[INFO] Stopping server..." << endl;
+                close(acceptorSocket);
+                exit(0);
+            }
+            case 'h': {
+                cout << "[INFO] + => start recording" << endl;
+                cout << "[INFO] - => stop recording" << endl;
+                cout << "[INFO] s => save recording" << endl;
+                cout << "[INFO] r => reset memory" << endl;
+                cout << "[INFO] q => exit" << endl;
+                break;
+            }
+            default: {
+                cout << "[WARNING] Unknown command... Press h for commands..." << endl;
                 break;
             }
         }
