@@ -26,6 +26,7 @@ private:
     float roll;
     float pitch;
     float yaw;
+    char anglesComputed;
     void computeAngles();
 
 //-------------------------------------------------------------------------------------------
@@ -35,7 +36,6 @@ public:
     float q1;
     float q2;
     float q3;
-    char anglesComputed;
     float beta;				// algorithm gain
     float invSampleFreq;
     Madgwick(void);

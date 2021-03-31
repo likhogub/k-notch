@@ -12,6 +12,7 @@ using namespace std;
 struct Record {
     int id;
     float ax, ay, az, gx, gy, gz, mx, my, mz;
+    float q0, q1, q2, q3;
 };
 
 // Measurements array

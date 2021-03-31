@@ -1,16 +1,15 @@
 #include "lib/TCPSocket.cpp"
 #include "lib/MadgwickAHRS.h"
-#include "lib/MadgwickAHRS.cpp"
 #include <thread>
+#include <mutex>
 using namespace std;
 
-
-Madgwick filter;
 
 // Measurement structure
 struct Record {
     int id;
     float ax, ay, az, gx, gy, gz, mx, my, mz;
+    float q0, q1, q2, q3;
 };
 
 void printRecord(Record* rec) {
@@ -26,35 +25,35 @@ void printRecord(Record* rec) {
         << rec->mz << " ";
 }
 
+double quat[4] = {0};
+mutex quatMutex;
+
+
 void clientThread(Socket clientSocket) {
     cout << "[INFO] Client connected." << endl;
-    char* buf = new char[129];
+    char ch;
     while (1) {
-        int receivedBytes = receiveDataTCP(clientSocket, buf, 128); // Wait request
+        int receivedBytes = receiveDataTCP(clientSocket, &ch, 128); // Wait request
         if (receivedBytes <= 0) break; // Interrupt if error or disconnect
-        string result = to_string(filter.q0);
+        quatMutex.lock();
+        string result = to_string(quat[0]);
         result += ";";
-        result += to_string(filter.q1);
+        result += to_string(quat[1]);
         result += ";";
-        result += to_string(filter.q2);
+        result += to_string(quat[2]);
         result += ";";
-        result += to_string(filter.q3);
-        result += ";";
-        result += to_string(filter.getPitch());
-        result += ";";
-        result += to_string(filter.getRoll());
-        result += ";";
-        result += to_string(filter.getYaw());
+        result += to_string(quat[3]);
+        quatMutex.unlock();
         sendDataTCP(clientSocket, result.c_str(), result.size());
     }
     close(clientSocket);
-    delete buf;
     cout << "[INFO] Client disconnected." << endl;
 }
 
 void acceptorThread() {
     Socket serverSocket = createSocketTCP();
     SocketProps* props = createSocketProps(1236);
+    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port
     bindSocket(serverSocket, props);
     listenSocket(serverSocket);
     cout << "[INFO] Madgwick filter started." << endl;
@@ -74,11 +73,19 @@ int main() {
     acceptor.detach();
     Record* buf = new Record[6];
     char ch = '0';
+    int i = 0;
     while (1) {
         sendDataTCP(sock, &ch, 1);
         receiveDataTCP(sock, (char*)buf, sizeof(Record[6]));
-        filter.update(buf->gx, buf->gy, buf->gz, buf->ax, buf->ay, buf->az, buf->mx, buf->my, buf->mz);
-        usleep(1000);
+
+        quatMutex.lock();
+        quat[0] = buf->q0;
+        quat[1] = buf->q1;
+        quat[2] = buf->q2;
+        quat[3] = buf->q3;
+        quatMutex.unlock();
+        //cout << quat[0] << " " << quat[1] << " " << quat[2] << " " << quat[3] << endl;
+        usleep(100);
     }
 
     return 0;

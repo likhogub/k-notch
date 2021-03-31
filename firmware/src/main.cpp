@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include "Kalman.h"
 #include "MPU9250.h"
+#include "MadgwickAHRS.h"
 
 int id = 0; //Device id
 
@@ -18,8 +19,10 @@ const char* password2 = "imperium01";
 struct Record {
     int id;
     float ax, ay, az, gx, gy, gz, mx, my, mz;
+    float q0, q1, q2, q3;
 };
 
+Madgwick filter;
 Record rec;
 WiFiClient client;
 MPU9250 IMU(Wire, 0x68);
@@ -38,8 +41,8 @@ void setup() {
     startWiFi();
     initDeviceId();
     if (initIMU() < 0) esp_restart();
-    IMU.calibrateGyro();
-    IMU.calibrateAccel();
+    //IMU.calibrateGyro();
+    //IMU.calibrateAccel();
 }
 
 void loop() {
@@ -106,6 +109,11 @@ void packRecord() {
     rec.mx = Kalman::filter(IMU.getMagX_uT(), 6);
     rec.my = Kalman::filter(IMU.getMagY_uT(), 7);
     rec.mz = Kalman::filter(IMU.getMagZ_uT(), 8);
+    filter.update(rec.gx, rec.gy, rec.gz, rec.ax, rec.ay, rec.az, rec.mx, rec.my, rec.mz);
+    rec.q0 = filter.q0;
+    rec.q1 = filter.q1;
+    rec.q2 = filter.q2;
+    rec.q3 = filter.q3;
 }
 
 int sendRecord() {
