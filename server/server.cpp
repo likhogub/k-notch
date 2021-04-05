@@ -157,7 +157,6 @@ int main() {
         char ch;
         cin >> ch;
         if (ch == 'p') {
-            //pthread_cancel(acceptor_thread_ptr);
             int ms;
             if (wait)
                 ms = (endTime - startTime)/1000000;

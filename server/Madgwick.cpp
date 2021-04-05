@@ -4,6 +4,10 @@
 #include <mutex>
 using namespace std;
 
+const char* HOST_IP = "127.0.0.1";
+const int HOST_PORT = 1235;
+const int OUTPUT_PORT = 1236;
+const int DEVICES = 6;
 
 // Measurement structure
 struct Record {
@@ -25,7 +29,7 @@ void printRecord(Record* rec) {
         << rec->mz << " ";
 }
 
-double quat[4] = {0};
+float quat[4*DEVICES] = {0};
 mutex quatMutex;
 
 
@@ -52,7 +56,7 @@ void clientThread(Socket clientSocket) {
 
 void acceptorThread() {
     Socket serverSocket = createSocketTCP();
-    SocketProps* props = createSocketProps(1236);
+    SocketProps* props = createSocketProps(OUTPUT_PORT);
     setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port
     bindSocket(serverSocket, props);
     listenSocket(serverSocket);
@@ -65,9 +69,8 @@ void acceptorThread() {
 }
 
 int main() {
-    //filter.begin(100);
     Socket sock = createSocketTCP();
-    SocketProps* props = createSocketProps("127.0.0.1", 1235); // Connect to data collecting server
+    SocketProps* props = createSocketProps(HOST_IP, HOST_PORT); // Connect to data collecting server
     connectSocket(sock, props);
     thread acceptor(acceptorThread);
     acceptor.detach();
@@ -76,17 +79,25 @@ int main() {
     int i = 0;
     while (1) {
         sendDataTCP(sock, &ch, 1);
-        receiveDataTCP(sock, (char*)buf, sizeof(Record[6]));
+        if (receiveDataTCP(sock, (char*)buf, sizeof(Record[6])) != sizeof(Record[6])) break;
 
         quatMutex.lock();
-        quat[0] = buf->q0;
-        quat[1] = buf->q1;
-        quat[2] = buf->q2;
-        quat[3] = buf->q3;
+        for (int i = 0; i < DEVICES; i++) {
+            quat[i*DEVICES] = buf[i].q0;
+            quat[i*DEVICES + 1] = buf[i].q1;
+            quat[i*DEVICES + 2] = buf[i].q2;
+            quat[i*DEVICES + 3] = buf[i].q3;
+        }
         quatMutex.unlock();
-        //cout << quat[0] << " " << quat[1] << " " << quat[2] << " " << quat[3] << endl;
+        
+        if (i % 100 == 0) {
+            for (int i = 0; i < DEVICES; i++)
+                cout << buf[i].q0 << " " << buf[i].q1 << " " << buf[i].q2 << " " << buf[i].q3 << " > ";
+            cout << endl;
+        }
+        i++;
         usleep(100);
     }
-
+    close(sock);
     return 0;
 }
