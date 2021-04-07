@@ -1,11 +1,12 @@
 console.log("Started")
 
-let quat = [0, 0, 0, 0]
+const DEVICES = 2
+let quat = []
 
 var socket = new WebSocket("ws://localhost:1237");
 
 socket.onopen = () => {
-  setInterval(()=>socket.send("k"), 20);
+  setInterval(()=>socket.send("k"), 10);
 }
 
 
@@ -13,12 +14,13 @@ socket.onopen = () => {
 socket.onmessage = event => {
   try {
     let x = event.data.toString().split(separator=";").map(x=>parseFloat(x))
-    for (let i = 0; i < 4*3; i++) {
+    for (let i = 0; i < 4*DEVICES; i++) {
       quat[i] = x[i]
     }
   } catch(e) {
-    console.log(e)
-    quat = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      quat = []
+      for (let i = 0; i < DEVICES; i++)
+        quat.push(0)
   }
   finally {}
 }
@@ -30,122 +32,80 @@ const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
-const map = new THREE.TextureLoader().load( 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/uv_grid_opengl.jpg' );
-				map.wrapS = map.wrapT = THREE.RepeatWrapping;
-				map.anisotropy = 16;
-const material1 = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide } );
-const geometry1 = new THREE.BoxGeometry(0.25, 0.75, 0.25);
-
-const cube = new THREE.Mesh( geometry1, material1 );
-const cube2 = new THREE.Mesh( geometry1, material1 );
-const cube3 = new THREE.Mesh( geometry1, material1 );
-
-const V = new THREE.Mesh(geometry1, material1)
-
-scene.add( cube )
-scene.add( cube2 )
-scene.add( cube3 )
-
-
 
 const camera = new THREE.PerspectiveCamera (45, window.innerWidth / window.innerHeight, 1, 10000);
 camera.position.x = 10;
 camera.position.y = 10;
 camera.position.z = 10;
 camera.lookAt (new THREE.Vector3(0,0,0));
+scene.add(camera);
 
 const ambientLight = new THREE.AmbientLight( 0xcccccc, 0.4 );
 scene.add( ambientLight );
 
 const pointLight = new THREE.PointLight( 0xffffff, 0.8 );
-camera.add( pointLight );
-scene.add( camera );
+camera.add(pointLight);
 
+controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-const gridHelper = new THREE.GridHelper( 10, 10 );
-scene.add( gridHelper );
+scene.add(new THREE.GridHelper(10, 10));
+scene.add(new THREE.AxesHelper(5));
 
-controls = new THREE.OrbitControls (camera, renderer.domElement);
-document.cube = cube;
+const figures = []
+const links = []
+const joints = [{x:0, y:0, z:0}]
 
-const axesHelper = new THREE.AxesHelper( 5 );
-scene.add( axesHelper );
+for (let i = 0; i < DEVICES; i++) {
+    // new line
+    const _points = [];
+    _points.push(new THREE.Vector3( 0, 0, 0 ));
+    _points.push(new THREE.Vector3( 0, 1, 0 ));
+    const _geometry = new THREE.BufferGeometry().setFromPoints(_points);
+    const _material = new THREE.LineBasicMaterial({color: 0xffffff});
+    const _line = new THREE.Line(_geometry, _material);
+    links.push(_line)
+    joints.push({x:0, y:0, z:0})
 
+    //new figure
 
-document.V = V
+    const map = new THREE.TextureLoader()
+                    .load( 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/uv_grid_opengl.jpg' );
+	map.wrapS = map.wrapT = THREE.RepeatWrapping;
+	map.anisotropy = 16;
+    const material1 = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide } );
+    const geometry1 = new THREE.BoxGeometry(0.25, 0.75, 0.25);
+    const _cube = new THREE.Mesh( geometry1, material1 );
+    figures.push(_cube)
+    
+    scene.add(_cube)
+    scene.add(_line)
+}
 
-const points = [];
-points.push( new THREE.Vector3( 0, 0, 0 ) );
-points.push( new THREE.Vector3( 0, 1, 0 ) );
+document.joints = joints
 
-const geometry = new THREE.BufferGeometry().setFromPoints( points );
-const material = new THREE.LineBasicMaterial( { color: 0xffffff } );
-const line = new THREE.Line( geometry, material );
-scene.add( line );
-
-const geometry3 = new THREE.BufferGeometry().setFromPoints( points );
-const material3 = new THREE.LineBasicMaterial( { color: 0xffffff } );
-const line2 = new THREE.Line( geometry3, material3 );
-scene.add( line2 );
-
-const geometry4 = new THREE.BufferGeometry().setFromPoints( points );
-const material4 = new THREE.LineBasicMaterial( { color: 0xffffff } );
-const line3 = new THREE.Line( geometry4, material4 );
-scene.add( line3 );
-
-
-const ZZZ = new THREE.Vector3(0,0,0)
 const animate = function () {
-  requestAnimationFrame( animate );
-  line.quaternion._w = quat[0]
-  line.quaternion._x = quat[1]
-  line.quaternion._y = quat[2]
-  line.quaternion._z = quat[3]
-
-  line2.position.x = line.matrix.elements[4]
-  line2.position.y = line.matrix.elements[5]
-  line2.position.z = line.matrix.elements[6]
-
-  line2.quaternion._w = quat[4]
-  line2.quaternion._x = quat[5]
-  line2.quaternion._y = quat[6]
-  line2.quaternion._z = quat[7]
-
-  line3.position.x = line2.matrix.elements[4] + line2.position.x
-  line3.position.y = line2.matrix.elements[5] + line2.position.y
-  line3.position.z = line2.matrix.elements[6] + line2.position.z
-
-  line3.quaternion._w = quat[8]
-  line3.quaternion._x = quat[9]
-  line3.quaternion._y = quat[10]
-  line3.quaternion._z = quat[11]
-
-  cube.position.x = line.matrix.elements[4] / 2
-  cube.position.y = line.matrix.elements[5] / 2
-  cube.position.z = line.matrix.elements[6] / 2
-  cube.quaternion._w = quat[0]
-  cube.quaternion._x = quat[1]
-  cube.quaternion._y = quat[2]
-  cube.quaternion._z = quat[3]
-
-
-  cube2.position.x = (line2.matrix.elements[4] + line.matrix.elements[4] + line.matrix.elements[4]) / 2
-  cube2.position.y = (line2.matrix.elements[5] + line.matrix.elements[5] + line.matrix.elements[5]) / 2
-  cube2.position.z = (line2.matrix.elements[6] + line.matrix.elements[6] + line.matrix.elements[6]) / 2
-  cube2.quaternion._w = quat[4]
-  cube2.quaternion._x = quat[5]
-  cube2.quaternion._y = quat[6]
-  cube2.quaternion._z = quat[7]
+    requestAnimationFrame( animate );
+    for (let i = 0; i < DEVICES; i++) {
+        links[i].position.x = joints[i].x
+        links[i].position.y = joints[i].y
+        links[i].position.z = joints[i].z
+        links[i].quaternion._w = quat[4*i]
+        links[i].quaternion._x = quat[4*i+1]
+        links[i].quaternion._y = quat[4*i+2]
+        links[i].quaternion._z = quat[4*i+3]
+        joints[i+1].x = links[i].matrix.elements[4] + joints[i].x
+        joints[i+1].y = links[i].matrix.elements[5] + joints[i].y
+        joints[i+1].z = links[i].matrix.elements[6] + joints[i].z
+        
+        figures[i].position.x = (joints[i].x + joints[i+1].x) / 2
+        figures[i].position.y = (joints[i].y + joints[i+1].y) / 2 
+        figures[i].position.z = (joints[i].z + joints[i+1].z) / 2 
+        figures[i].quaternion._w = quat[4*i]
+        figures[i].quaternion._x = quat[4*i+1]
+        figures[i].quaternion._y = quat[4*i+2]
+        figures[i].quaternion._z = quat[4*i+3]
+    }
   
-  cube3.position.x = (line3.matrix.elements[4] + 2*(line2.matrix.elements[4] + line.matrix.elements[4])) / 2
-  cube3.position.y = (line3.matrix.elements[5] + 2*(line2.matrix.elements[5] + line.matrix.elements[5])) / 2
-  cube3.position.z = (line3.matrix.elements[6] + 2*(line2.matrix.elements[6] + line.matrix.elements[6])) / 2
-  cube3.quaternion._w = quat[8]
-  cube3.quaternion._x = quat[9]
-  cube3.quaternion._y = quat[10]
-  cube3.quaternion._z = quat[11]
-
-
 
   renderer.render( scene, camera );
 };

@@ -40,16 +40,16 @@ void setup() {
     Wire.begin();
     startWiFi(SSID1, PASS1);
     if (initIMU() < 0) esp_restart();
-    IMU.setMagCalX(23, 1);
-    IMU.setMagCalY(22, 1);
-    IMU.setMagCalZ(-0.5, 1);
+    //IMU.setMagCalX(23, 1);
+    //IMU.setMagCalY(22, 1);
+    //IMU.setMagCalZ(-0.5, 1);
 
     IMU.calibrateGyro();
-    IMU.setSrd(19);
+    //IMU.setSrd(19);
 
-    IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);
+    IMU.setAccelRange(MPU9250::ACCEL_RANGE_4G);
     IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
-    IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_5HZ);
+    IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_184HZ);
 }
 
 void loop() {
