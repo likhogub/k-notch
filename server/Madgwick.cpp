@@ -2,12 +2,15 @@
 #include "lib/MadgwickAHRS.h"
 #include <thread>
 #include <mutex>
+#include <signal.h>
 using namespace std;
 
 const char* HOST_IP = "127.0.0.1";
 const int HOST_PORT = 1235;
 const int OUTPUT_PORT = 1236;
 const int DEVICES = 6;
+
+Socket serverSocket;
 
 // Measurement structure
 struct Record {
@@ -41,12 +44,10 @@ void clientThread(Socket clientSocket) {
         if (receivedBytes <= 0) break; // Interrupt if error or disconnect
         quatMutex.lock();
         string result = to_string(quat[0]);
-        result += ";";
-        result += to_string(quat[1]);
-        result += ";";
-        result += to_string(quat[2]);
-        result += ";";
-        result += to_string(quat[3]);
+        for (int i = 1; i < 4*DEVICES; i++) {
+            result += ";";
+            result += to_string(quat[i]);
+        }
         quatMutex.unlock();
         sendDataTCP(clientSocket, result.c_str(), result.size());
     }
@@ -55,10 +56,10 @@ void clientThread(Socket clientSocket) {
 }
 
 void acceptorThread() {
-    Socket serverSocket = createSocketTCP();
+    serverSocket = createSocketTCP();
     SocketProps* props = createSocketProps(OUTPUT_PORT);
     setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port
-    bindSocket(serverSocket, props);
+    if (bindSocket(serverSocket, props) < 0) exit(1);
     listenSocket(serverSocket);
     cout << "[INFO] Madgwick filter started." << endl;
     while (1) {
@@ -66,9 +67,18 @@ void acceptorThread() {
         thread client(clientThread, clientSocket);
         client.detach();
     }
+    exit(1);
+}
+
+void terminate (int param)
+{
+    std::cout << "Stopping..." << std::endl;
+    close(serverSocket);
+    exit(0);
 }
 
 int main() {
+    signal(SIGINT, terminate);
     Socket sock = createSocketTCP();
     SocketProps* props = createSocketProps(HOST_IP, HOST_PORT); // Connect to data collecting server
     connectSocket(sock, props);
@@ -79,14 +89,15 @@ int main() {
     int i = 0;
     while (1) {
         sendDataTCP(sock, &ch, 1);
-        if (receiveDataTCP(sock, (char*)buf, sizeof(Record[6])) != sizeof(Record[6])) break;
+        if (receiveDataTCP(sock, (char*)buf, sizeof(Record[6])) != sizeof(Record[6])) continue;
 
         quatMutex.lock();
         for (int i = 0; i < DEVICES; i++) {
-            quat[i*DEVICES] = buf[i].q0;
-            quat[i*DEVICES + 1] = buf[i].q1;
-            quat[i*DEVICES + 2] = buf[i].q2;
-            quat[i*DEVICES + 3] = buf[i].q3;
+            if ((buf[i].q0 + buf[i].q1 + buf[i].q2 + buf[i].q3) == 0) continue;
+            quat[i*4] = buf[i].q0;
+            quat[i*4 + 1] = buf[i].q1;
+            quat[i*4 + 2] = buf[i].q2;
+            quat[i*4 + 3] = buf[i].q3;
         }
         quatMutex.unlock();
         
@@ -96,8 +107,7 @@ int main() {
             cout << endl;
         }
         i++;
-        usleep(100);
+        usleep(1000);
     }
-    close(sock);
     return 0;
 }

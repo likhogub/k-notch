@@ -9,7 +9,6 @@ client.connect(1236, '127.0.0.1', function() {
 	console.log('Connected')
 })
 
-
 client.on('data', function(data) {
 	buffer = data.toString()
 	

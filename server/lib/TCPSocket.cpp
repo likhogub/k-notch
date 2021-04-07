@@ -51,6 +51,7 @@ Socket listenSocket(Socket sock, int queueLength=-1) {
 Socket bindSocket(Socket sock, SocketProps* socketProps) {
     if (-1 == bind(sock, (sockaddr* )socketProps, sizeof(*socketProps))) {
         perror("Socket bind error");
+        return -1;
     }
     return sock;
 }

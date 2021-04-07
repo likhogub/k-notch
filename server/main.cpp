@@ -8,13 +8,14 @@ using namespace std;
 
 
 const int DEVICES = 6;
-const int MINUTES = 15;
+const int MINUTES = 60;
 
 const int PORT = 1234;
 const int DATAGATE_PORT = 1235;
 
-//Global acceptor socket variable (for signal)
+//Global socket variable (for signal)
 Socket acceptorSocket;
+Socket dataGateSocket;
 
 // Measurement structure
 struct Record {
@@ -27,7 +28,7 @@ struct Record {
 Record storage[MINUTES*60*1000][DEVICES];
 
 // Device ID -> sensor index
-int idToIndexMapping[256] = {-1};
+int idToIndexMapping[256] = {0};
 
 // Measuring state
 atomic<bool> isMeasuring (false);
@@ -83,9 +84,13 @@ void saveToCSV(long start, long stop) {
 
 // ID -> INDEX
 int idToIndex(int deviceId) {
-    if (idToIndexMapping[deviceId] == -1) 
-        idToIndexMapping[deviceId] = max(idToIndexMapping[0], idToIndexMapping[255]) + 1;
-    return idToIndexMapping[deviceId];
+    if (!idToIndexMapping[deviceId]) {
+        int _m = idToIndexMapping[0];
+        for (int i = 0; i < 256; i++) 
+            _m = (idToIndexMapping[i] > _m) ? idToIndexMapping[i] : _m;
+        idToIndexMapping[deviceId] = _m + 1;
+    } 
+    return idToIndexMapping[deviceId] - 1;
 }
 
 
@@ -94,11 +99,11 @@ void clientThread(Socket clientSocket) {
     memset(recordBuffer, 0, sizeof(Record)); // Clear buffer memory
     int deviceId = -1; // Initial invalid device id
     do {
-        cout << receiveDataTCP(clientSocket, (char*)(recordBuffer), sizeof(Record)) << endl;
-        cout << recordBuffer->ax << " " << recordBuffer->ay << " " << recordBuffer->az << endl;
+        receiveDataTCP(clientSocket, (char*)(recordBuffer), sizeof(Record));
         deviceId = recordBuffer->id;
     } while ((deviceId < 0) || (deviceId > 255)); // Wait until "good" device id arrive
     int deviceIndex = idToIndex(deviceId); // Array index assignment
+    cout << "[INFO] Device " << deviceId << " connected as " << deviceIndex<< endl;
     while (1) {
         while (!isMeasuring); // Wait command
         int receivedBytes = receiveDataTCP(clientSocket, (char*)(recordBuffer), sizeof(Record));
@@ -126,7 +131,6 @@ void acceptorThread(Socket acceptorSocket) {
     tv.tv_usec = 0;
     while (1) {
         Socket clientSocket = acceptSocket(acceptorSocket);
-        cout << "[INFO] Device connected." << endl;
         setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
         thread newThread(clientThread, clientSocket); // Run new thread for each device
         newThread.detach();
@@ -160,7 +164,7 @@ void dataGateThread(Socket clientSocket) {
 }
 
 void dataGateAcceptorThread() {
-    Socket dataGateSocket = createSocketTCP();
+    dataGateSocket = createSocketTCP();
     SocketProps* dataGateProps = createSocketProps(DATAGATE_PORT);
     setsockopt(dataGateSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port
     bindSocket(dataGateSocket, dataGateProps);
@@ -177,11 +181,12 @@ void terminate (int param)
 {
     std::cout << "Stopping..." << std::endl;
     close(acceptorSocket);
+    close(dataGateSocket);
     exit(0);
 }
 
 int main() {
-    signal(SIGTERM, terminate);
+    signal(SIGINT, terminate);
     acceptorSocket = createSocketTCP();
     SocketProps* acceptorProps = createSocketProps(PORT);
     setsockopt(acceptorSocket, SOL_SOCKET, SO_REUSEADDR, 0, sizeof(int)); // Allow reusing port

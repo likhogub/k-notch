@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include "Kalman.h"
 #include "MPU9250.h"
+#include "MadgwickAHRS.h"
 
 const char* IP = "192.168.1.42";
 const int PORT = 1234;
@@ -21,8 +22,9 @@ struct Record {
 
 Record rec;
 WiFiClient client;
-MPU9250 IMU;
-long lastMS = 0; // Last measurement timestamp
+MPU9250 IMU(Wire, 0x68);
+Madgwick filter;
+long long lastMS = 0; // Last measurement timestamp
 
 void startWiFi(const char* ssid, const char* pass);
 void connectHost(const char* ip, int port);
@@ -38,8 +40,16 @@ void setup() {
     Wire.begin();
     startWiFi(SSID1, PASS1);
     if (initIMU() < 0) esp_restart();
-    IMU.setMagBias(23, 22, -0.5);
-    IMU.setMagScale(1, 1, 1);
+    IMU.setMagCalX(23, 1);
+    IMU.setMagCalY(22, 1);
+    IMU.setMagCalZ(-0.5, 1);
+
+    IMU.calibrateGyro();
+    IMU.setSrd(19);
+
+    IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);
+    IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
+    IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_5HZ);
 }
 
 void loop() {
@@ -62,7 +72,6 @@ void startWiFi(const char* ssid, const char* pass) {
     Serial.println("");
     String ipString = WiFi.localIP().toString();
     rec.id = atoi(ipString.substring(ipString.lastIndexOf('.') + 1).c_str());
-    Serial.println(ipString);
     Serial.println(rec.id);
 }
 
@@ -78,40 +87,73 @@ int isConnectedToHost() {
 
 
 int initIMU() {
-    int status = IMU.setup(0x69);
-    Serial.println(status);
-    if (status < 0) {
+    if (IMU.begin() < 0) {
         Serial.println("IMU initialization unsuccessful");
         Serial.println("Check IMU wiring or try cycling power");
         Serial.print("Status: ");
-        Serial.println(status);
+        return -1;
     }
-    return status;
+    return 0;
 }
 
 
 int isIMUReady() {
-    return IMU.update();
+    return IMU.readSensor();
 }
 
-
+long i = 0;
 void packRecord() {
-    rec.ax = Kalman::filter(IMU.getAccX(), 0);
-    rec.ay = Kalman::filter(IMU.getAccY(), 1);
-    rec.az = Kalman::filter(IMU.getAccZ(), 2);
-    rec.gx = Kalman::filter(IMU.getGyroX(), 3);
-    rec.gy = Kalman::filter(IMU.getGyroY(), 4);
-    rec.gz = Kalman::filter(IMU.getGyroZ(), 5);
-    rec.mx = IMU.getMagX();
-    rec.my = IMU.getMagY();
-    rec.mz = IMU.getMagZ();
-    rec.q0 = IMU.getQuaternionW();
-    rec.q1 = IMU.getQuaternionX();
-    rec.q2 = IMU.getQuaternionY();
-    rec.q3 = IMU.getQuaternionZ();
+    rec.ax = IMU.getAccelX_mss();
+    rec.ay = IMU.getAccelY_mss();
+    rec.az = IMU.getAccelZ_mss();
+    rec.gx = IMU.getGyroX_rads();
+    rec.gy = IMU.getGyroY_rads();
+    rec.gz = IMU.getGyroZ_rads();
+    rec.mx = IMU.getMagX_uT();
+    rec.my = IMU.getMagY_uT();
+    rec.mz = IMU.getMagZ_uT();
+
+    long long curMS = esp_timer_get_time();
+    filter.invSampleFreq = (curMS - lastMS) / 20000.0f;
+    lastMS = curMS;
+    if (i%500 == 0)
+        filter.update(rec.gx, rec.gy, rec.gz, rec.ax, rec.ay, rec.az, rec.mx, rec.my, rec.mz);
+    else
+        filter.updateIMU(rec.gx, rec.gy, rec.gz, rec.ax, rec.ay, rec.az);
+
+    rec.q0 = filter.q0;
+    rec.q1 = filter.q1;
+    rec.q2 = filter.q2;
+    rec.q3 = filter.q3;
+    i++;
 }
 
 
 int sendRecord() {
     return client.write((char*)&rec, sizeof(Record));
 }
+
+// float getRndFloat() {
+//     return 1.0f * rand() / 32768.0f;
+// }
+
+
+// int isIMUReady() {
+//     return 1;
+// }
+
+// void packRecord() {
+//     rec.ax = getRndFloat();
+//     rec.ay = getRndFloat();
+//     rec.az = getRndFloat();
+//     rec.gx = getRndFloat();
+//     rec.gy = getRndFloat();
+//     rec.gz = getRndFloat();
+//     rec.mx = getRndFloat();
+//     rec.my = getRndFloat();
+//     rec.mz = getRndFloat();
+//     rec.q0 = getRndFloat();
+//     rec.q1 = getRndFloat();
+//     rec.q2 = getRndFloat();
+//     rec.q3 = getRndFloat();
+// }
