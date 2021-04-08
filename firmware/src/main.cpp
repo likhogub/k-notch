@@ -4,7 +4,9 @@
 #include "MPU9250.h"
 #include "MadgwickAHRS.h"
 
-const char* IP = "192.168.1.42";
+//const char* IP = "192.168.1.42";
+const char* IP = "192.168.43.135";
+
 const int PORT = 1234;
 
 const char* SSID1 = "K-Lab";
@@ -38,16 +40,17 @@ int sendRecord();
 void setup() {
     Serial.begin(115200);
     Wire.begin();
-    startWiFi(SSID1, PASS1);
+    startWiFi(SSID2, PASS2);
     if (initIMU() < 0) esp_restart();
     //IMU.setMagCalX(23, 1);
     //IMU.setMagCalY(22, 1);
     //IMU.setMagCalZ(-0.5, 1);
 
     IMU.calibrateGyro();
-    //IMU.setSrd(19);
+    IMU.calibrateAccel();
+    IMU.setSrd(0);
 
-    IMU.setAccelRange(MPU9250::ACCEL_RANGE_4G);
+    IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);
     IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
     IMU.setDlpfBandwidth(MPU9250::DLPF_BANDWIDTH_184HZ);
 }
