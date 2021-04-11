@@ -32,6 +32,8 @@ int idToIndexMapping[256] = {0};
 
 // Measuring state
 atomic<bool> isMeasuring (false);
+atomic<bool> isAborting (false);
+
 
 // Measurement started timestamp 
 long startTime = 0;
@@ -101,7 +103,7 @@ void clientThread(Socket clientSocket) {
     do {
         receiveDataTCP(clientSocket, (char*)(recordBuffer), sizeof(Record));
         deviceId = recordBuffer->id;
-    } while ((deviceId < 0) || (deviceId > 255)); // Wait until "good" device id arrive
+    } while ((deviceId < 0) || (deviceId > 255) || isAborting); // Wait until "good" device id arrive
     int deviceIndex = idToIndex(deviceId); // Array index assignment
     cout << "[INFO] Device " << deviceId << " connected as " << deviceIndex<< endl;
     while (1) {
