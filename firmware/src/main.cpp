@@ -5,7 +5,7 @@
 #include "MadgwickAHRS.h"
 
 //const char* IP = "192.168.1.42";
-const char* IP = "192.168.43.135";
+const char* IP = "192.168.1.159";
 
 const int PORT = 1234;
 
@@ -47,7 +47,7 @@ void setup() {
     //IMU.setMagCalZ(-0.5, 1);
 
     IMU.calibrateGyro();
-    IMU.calibrateAccel();
+    //IMU.calibrateAccel();
     IMU.setSrd(0);
 
     IMU.setAccelRange(MPU9250::ACCEL_RANGE_2G);

@@ -1,6 +1,6 @@
 console.log("Started")
 
-const DEVICES = 2
+const DEVICES = 1
 let quat = []
 
 var socket = new WebSocket("ws://localhost:1237");
@@ -26,7 +26,7 @@ socket.onmessage = event => {
 }
 
 socket.onclose = () => alert("Connection lost")
-
+ 
 const scene = new THREE.Scene();
 
 const renderer = new THREE.WebGLRenderer();
@@ -67,47 +67,59 @@ for (let i = 0; i < DEVICES; i++) {
     joints.push({x:0, y:0, z:0})
 
     //new figure
-
     const map = new THREE.TextureLoader()
                     .load( 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/uv_grid_opengl.jpg' );
+
 	map.wrapS = map.wrapT = THREE.RepeatWrapping;
 	map.anisotropy = 16;
-    const material1 = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide } );
-    const geometry1 = new THREE.BoxGeometry(0.25, 0.75, 0.25);
-    const _cube = new THREE.Mesh( geometry1, material1 );
-    figures.push(_cube)
-    
-    scene.add(_cube)
-    scene.add(_line)
+  const material1 = new THREE.MeshPhongMaterial( { map: map, side: THREE.DoubleSide } );
+  const geometry1 = new THREE.BoxGeometry(0.5, 0.75, 0.25);
+  const _cube = new THREE.Mesh( geometry1, material1 );
+  figures.push(_cube)
+  
+  scene.add(_cube)
+  scene.add(_line)
 }
 
-document.joints = joints
+const kQ = [ 0, Math.sqrt(0.5), -Math.sqrt(0.5), 0]
+const off = new THREE.Quaternion(0, 0, 0, 1)
 
 const animate = function () {
     requestAnimationFrame( animate );
     for (let i = 0; i < DEVICES; i++) {
+        //const q = new THREE.Quaternion(quat[4*i+3], quat[4*i],quat[4*i+1],quat[4*i+2])
+        const q = new THREE.Quaternion(quat[4*i], -quat[4*i+1], -quat[4*i+3],quat[4*i+2])
+        q.premultiply(off)
+
         links[i].position.x = joints[i].x
         links[i].position.y = joints[i].y
         links[i].position.z = joints[i].z
-        links[i].quaternion._w = quat[4*i]
-        links[i].quaternion._x = quat[4*i+1]
-        links[i].quaternion._y = quat[4*i+2]
-        links[i].quaternion._z = quat[4*i+3]
+
+        links[i].quaternion._x = kQ[0]
+        links[i].quaternion._y = kQ[1]
+        links[i].quaternion._z = kQ[2]
+        links[i].quaternion._w = kQ[3]
+
+        links[i].applyQuaternion(q)
+        
         joints[i+1].x = links[i].matrix.elements[4] + joints[i].x
         joints[i+1].y = links[i].matrix.elements[5] + joints[i].y
         joints[i+1].z = links[i].matrix.elements[6] + joints[i].z
         
         figures[i].position.x = (joints[i].x + joints[i+1].x) / 2
         figures[i].position.y = (joints[i].y + joints[i+1].y) / 2 
-        figures[i].position.z = (joints[i].z + joints[i+1].z) / 2 
-        figures[i].quaternion._w = quat[4*i]
-        figures[i].quaternion._x = quat[4*i+1]
-        figures[i].quaternion._y = quat[4*i+2]
-        figures[i].quaternion._z = quat[4*i+3]
-    }
-  
+        figures[i].position.z = (joints[i].z + joints[i+1].z) / 2
+        
+        figures[i].quaternion._x = kQ[0]
+        figures[i].quaternion._y = kQ[1]
+        figures[i].quaternion._z = kQ[2]
+        figures[i].quaternion._w = kQ[3]
 
-  renderer.render( scene, camera );
+
+        figures[i].applyQuaternion(q)
+    }
+
+    renderer.render( scene, camera );
 };
 
 
