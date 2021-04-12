@@ -1,6 +1,6 @@
 console.log("Started")
 
-const DEVICES = 1
+const DEVICES = 2
 let quat = []
 
 var socket = new WebSocket("ws://localhost:1237");
@@ -81,7 +81,7 @@ for (let i = 0; i < DEVICES; i++) {
   scene.add(_line)
 }
 
-const kQ = [ 0, Math.sqrt(0.5), -Math.sqrt(0.5), 0]
+const kQ = [ 0, Math.sqrt(0.5), Math.sqrt(0.5), 0]
 const off = new THREE.Quaternion(0, 0, 0, 1)
 
 const animate = function () {

@@ -4,8 +4,7 @@
 #include "MPU9250.h"
 #include "MadgwickAHRS.h"
 
-//const char* IP = "192.168.1.42";
-const char* IP = "192.168.1.159";
+const char* IP = "192.168.1.42";
 
 const int PORT = 1234;
 
@@ -14,6 +13,10 @@ const char* PASS1 = "allhailklab";
 
 const char* SSID2 = "ImperiumDev";
 const char* PASS2 = "imperium01";
+
+const char* SSID = SSID1;
+const char* PASS = PASS1;
+
 
 // Measurement structure
 struct Record {
@@ -40,8 +43,11 @@ int sendRecord();
 void setup() {
     Serial.begin(115200);
     Wire.begin();
-    startWiFi(SSID2, PASS2);
+    startWiFi(SSID, PASS);
     if (initIMU() < 0) esp_restart();
+    // IMU.setAccelCalX(-4.5, 1);
+    // IMU.setAccelCalY(-6.14, 1);
+    // IMU.setAccelCalZ(1.3, 0.95);
     //IMU.setMagCalX(23, 1);
     //IMU.setMagCalY(22, 1);
     //IMU.setMagCalZ(-0.5, 1);
